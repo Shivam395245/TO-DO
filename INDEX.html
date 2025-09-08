@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TodoFlow — Beautiful To‑Do List</title>
+  <style>
+    /* ======================
+       Base & Theme
+       ====================== */
+    :root{
+      --bg1:#0f1020; /* deep space */
+      --bg2:#1a1b3a;
+      --accent:#7c5cff; /* purple */
+      --accent-2:#2de2e6; /* teal */
+      --text:#e9e9ee;
+      --muted:#a3a3b3;
+      --card:#15162aaf; /* glass */
+      --card-border: #7c5cff33;
+      --danger:#ff4d6d;
+      --success:#2ce88f;
+      --shadow: 0 10px 30px rgba(0,0,0,.45), 0 0 40px #7c5cff22 inset;
+    }
+    @media (prefers-color-scheme: light){
+      :root{
+        --bg1:#edf1ff; --bg2:#f9fbff; --text:#131523; --muted:#5a6072; --card:#ffffffc7; --card-border:#7c5cff22;
+      }
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji","Segoe UI Emoji"; color:var(--text);
+      background: radial-gradient(60vmax 60vmax at 110% -10%, #7c5cff22, transparent 60%),
+                  radial-gradient(50vmax 50vmax at -10% 120%, #2de2e622, transparent 60%),
+                  linear-gradient(120deg, var(--bg1), var(--bg2));
+      overflow-x:hidden;
+    }
+
+    /* Animated background glow */
+    .glow{
+      position: fixed; inset:-20vmax; pointer-events:none; z-index:-1; filter: blur(60px) saturate(140%); opacity:.65; animation: float 24s ease-in-out infinite;
+      background: conic-gradient(from 0deg at 50% 50%, #7c5cff33, #2de2e633, #ff4d6d22, #7c5cff33);
+    }
+    @keyframes float { 0%,100%{ transform: translateY(-2%) rotate(0deg) } 50%{ transform: translateY(2%) rotate(180deg) } }
+
+    /* ======================
+       Layout
+       ====================== */
+    .wrap{ min-height:100%; display:grid; place-items:center; padding: clamp(20px, 4vw, 40px); }
+    .card{
+      width:min(920px, 92vw); background:var(--card); border:1px solid var(--card-border); border-radius:24px; box-shadow:var(--shadow);
+      backdrop-filter: blur(14px) saturate(1.2); -webkit-backdrop-filter: blur(14px) saturate(1.2);
+      overflow:hidden; animation: cardIn .7s cubic-bezier(.2,.8,.2,1);
+    }
+    @keyframes cardIn{ from{opacity:0; transform: translateY(10px) scale(.98)} to{opacity:1; transform:none} }
+
+    .header{ position:relative; padding:28px clamp(20px, 5vw, 40px); background:
+      radial-gradient(80% 80% at 0% 0%, #7c5cff22, transparent 50%),
+      radial-gradient(80% 80% at 100% 100%, #2de2e622, transparent 50%);
+    }
+    .title{ display:flex; gap:16px; align-items:center; }
+    .logo{
+      width:42px; height:42px; border-radius:12px; display:grid; place-items:center; color:white;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2)); box-shadow: 0 8px 24px #7c5cff55;
+      transform: perspective(400px) rotateX(8deg); animation: wobble 5s ease-in-out infinite;
+    }
+    @keyframes wobble { 0%,100%{ transform: perspective(400px) rotateX(8deg) rotateZ(0deg)} 50%{ transform: perspective(400px) rotateX(4deg) rotateZ(2deg)} }
+    .title h1{ margin:0; font-size: clamp(24px, 4vw, 34px); letter-spacing:.3px; }
+    .subtitle{ margin:6px 0 0; color:var(--muted); font-size:14px }
+
+    .controls{ display:flex; gap:12px; flex-wrap:wrap; margin-top:18px }
+    .input{ flex:1; display:flex; gap:10px; align-items:center; background:#00000018; border:1px solid #ffffff22; border-radius:14px; padding:8px 12px; }
+    .input input{ flex:1; border:0; outline:none; background:transparent; color:var(--text); font-size:16px; padding:10px 6px }
+    .btn{
+      display:inline-grid; place-items:center; border:0; padding:12px 16px; border-radius:14px; cursor:pointer; font-weight:600; letter-spacing:.3px;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2)); color:white; box-shadow: 0 10px 24px #7c5cff66, 0 0 0 0 #7c5cff33;
+      transition: transform .18s ease, box-shadow .18s ease, filter .2s ease; will-change: transform;
+    }
+    .btn:hover{ transform: translateY(-1px); box-shadow: 0 16px 30px #7c5cff77, 0 0 0 6px #7c5cff18 }
+    .btn:active{ transform: translateY(0) scale(.98) }
+
+    .filters{ display:flex; gap:8px; align-items:center; flex-wrap:wrap }
+    .chip{ position:relative; border:1px solid #ffffff22; background:#00000018; color:var(--text); padding:10px 14px; border-radius:999px; cursor:pointer; font-weight:600; }
+    .chip[data-active="true"]{ border-color: transparent; background: linear-gradient(135deg, #ffffff14, #ffffff05); }
+    .chip[data-active="true"]::after{ content:""; position:absolute; inset:auto 12px -2px 12px; height:3px; border-radius:3px; background:linear-gradient(90deg, var(--accent), var(--accent-2)); animation: underline .5s ease }
+    @keyframes underline{ from{ transform: scaleX(0); transform-origin:left } to{ transform: scaleX(1)} }
+
+    .list{ padding: 10px clamp(14px, 3vw, 28px) 24px; }
+
+    .task{ position:relative; display:grid; grid-template-columns: 28px 1fr auto; gap:14px; align-items:center; background:#ffffff07; border:1px solid #ffffff14; border-radius:16px; padding:12px 14px; margin:10px 0; box-shadow: 0 6px 18px rgba(0,0,0,.18);
+      animation: slideIn .3s ease; transform-origin: top center; }
+    @keyframes slideIn{ from{opacity:0; transform: translateY(6px) scale(.98)} to{opacity:1; transform:none} }
+
+    .task[draggable="true"]{ cursor: grab }
+    .task.dragging{ opacity:.6; transform: rotate(1deg) scale(.995) }
+    .drag-handle{ width:22px; height:22px; border-radius:8px; display:grid; place-items:center; background:#00000016; border:1px dashed #ffffff26; }
+
+    /* Custom checkbox with animated check */
+    .check{
+      --size:22px; position:relative; width:var(--size); height:var(--size); border-radius:8px; display:grid; place-items:center; cursor:pointer;
+      border:1.6px solid #b9b9c9; transition: all .18s ease; background: #0b0c1a55;
+    }
+    .check svg{ width:16px; height:16px; stroke-dasharray: 22; stroke-dashoffset:22; transition: stroke-dashoffset .3s ease .05s }
+    .check[data-checked="true"]{ background: linear-gradient(135deg, var(--accent), var(--accent-2)); border-color: transparent; box-shadow: 0 6px 18px #7c5cff66 }
+    .check[data-checked="true"] svg{ stroke-dashoffset:0 }
+
+    .task-content{ display:flex; align-items:center; gap:10px }
+    .task input[type="text"]{ width:100%; background:transparent; border:0; outline:none; color:var(--text); font-size:16px; padding:6px 8px; border-radius:8px; transition: background .2s }
+    .task input[type="text"]:focus{ background:#ffffff0f }
+    .task.completed .task-title{ text-decoration: line-through; opacity:.55; }
+
+    .tags{ display:flex; gap:6px; flex-wrap:wrap }
+    .tag{ font-size:11px; font-weight:700; padding:4px 8px; border-radius:999px; color:#0b0c1a; background: #2de2e6; mix-blend: screen }
+    .tag.soon{ background: #ffcc00 }
+
+    .task-actions{ display:flex; gap:8px; align-items:center }
+    .icon-btn{ border:0; background:#00000018; border:1px solid #ffffff1c; width:36px; height:36px; border-radius:12px; display:grid; place-items:center; cursor:pointer; transition: transform .16s ease, background .16s ease, border-color .16s ease }
+    .icon-btn:hover{ transform: translateY(-1px); background:#00000026; border-color:#ffffff40 }
+    .icon-btn.delete:hover{ background:#ff4d6d22; border-color:#ff4d6d55 }
+
+    .footer{ display:flex; justify-content:space-between; align-items:center; padding: 14px clamp(16px, 4vw, 26px) 22px; border-top:1px solid #ffffff1a; color:var(--muted); font-size:14px }
+    .footer .left{ display:flex; align-items:center; gap:10px }
+
+    /* Tiny tooltip */
+    .tip{ position:relative }
+    .tip:hover::after{ content: attr(data-tip); position:absolute; bottom:calc(100% + 8px); left:50%; transform:translateX(-50%); background:#0b0c1a; color:#fff; padding:6px 8px; font-size:12px; border-radius:6px; white-space:nowrap; box-shadow:0 6px 16px rgba(0,0,0,.4); }
+
+    /* Empty state */
+    .empty{ text-align:center; padding:24px; color:var(--muted) }
+    .empty svg{ opacity:.7 }
+
+    /* Hide native checkbox */
+    input[type="checkbox"]{ display:none }
+
+    /* Responsive tweaks */
+    @media (max-width:520px){
+      .task{ grid-template-columns: 28px 1fr; }
+      .drag-handle{ display:none }
+    }
+  </style>
+</head>
+<body>
+  <div class="glow" aria-hidden="true"></div>
+  <div class="wrap">
+    <section class="card" role="application" aria-label="TodoFlow To‑Do List">
+      <header class="header">
+        <div class="title">
+          <div class="logo" aria-hidden="true">
+            <!-- checkmark logo -->
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <polyline points="20 6 9 17 4 12"/>
+            </svg>
+          </div>
+          <div>
+            <h1>TodoFlow</h1>
+            <p class="subtitle">A gorgeous, animated to‑do list with drag‑drop, filters, and offline save.</p>
+          </div>
+        </div>
+
+        <div class="controls" id="controls">
+          <div class="input" style="flex: 2">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>
+            <input id="todo-input" type="text" placeholder="Add a task and press Enter…" aria-label="Add a task" autocomplete="off" />
+          </div>
+          <button class="btn" id="add-btn" aria-label="Add Task">
+            <span style="display:flex; gap:8px; align-items:center">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+              Add
+            </span>
+          </button>
+          <div class="filters" role="tablist" aria-label="Filters">
+            <button class="chip" data-filter="all" data-active="true" role="tab" aria-selected="true">All</button>
+            <button class="chip" data-filter="active" role="tab" aria-selected="false">Active</button>
+            <button class="chip" data-filter="completed" role="tab" aria-selected="false">Completed</button>
+          </div>
+        </div>
+      </header>
+
+      <div class="list" id="list" aria-live="polite">
+        <!-- tasks render here -->
+      </div>
+
+      <footer class="footer">
+        <div class="left">
+          <span id="count">0 items</span>
+          <button class="chip tip" id="clear-completed" data-tip="Remove finished tasks">Clear Completed</button>
+        </div>
+        <div style="display:flex; gap:8px; align-items:center">
+          <button class="icon-btn tip" id="export-json" data-tip="Download backup JSON" aria-label="Export">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          </button>
+          <button class="icon-btn tip" id="import-json" data-tip="Import backup JSON" aria-label="Import">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 10 12 15 7 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          </button>
+          <input type="file" id="file-input" accept="application/json" hidden />
+        </div>
+      </footer>
+    </section>
+  </div>
+
+  <template id="task-template">
+    <div class="task" draggable="true">
+      <div class="check" role="checkbox" aria-checked="false" tabindex="0">
+        <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+      </div>
+      <div class="task-content">
+        <input class="task-title" type="text" value="" aria-label="Task title" />
+        <div class="tags"></div>
+      </div>
+      <div class="task-actions">
+        <button class="icon-btn tip edit" data-tip="Rename (double‑click text)">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4Z"/></svg>
+        </button>
+        <button class="icon-btn tip delete" data-tip="Delete">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+        </button>
+        <div class="drag-handle tip" data-tip="Drag to reorder" aria-hidden="true">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" opacity=".5">
+            <circle cx="5" cy="7" r="1.6"/><circle cx="5" cy="12" r="1.6"/><circle cx="5" cy="17" r="1.6"/>
+            <circle cx="12" cy="7" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="17" r="1.6"/>
+            <circle cx="19" cy="7" r="1.6"/><circle cx="19" cy="12" r="1.6"/><circle cx="19" cy="17" r="1.6"/>
+          </svg>
+        </div>
+      </div>
+    </div>
+  </template>
+
+  <script>
+    // ===============================
+    // TodoFlow — Vanilla JS
+    // Features: add/edit/delete/toggle, filters, drag-drop sort, localStorage, import/export, animations
+    // ===============================
+
+    const el = {
+      input: document.getElementById('todo-input'),
+      addBtn: document.getElementById('add-btn'),
+      list: document.getElementById('list'),
+      template: document.getElementById('task-template'),
+      chips: [...document.querySelectorAll('.chip[data-filter]')],
+      clearCompleted: document.getElementById('clear-completed'),
+      count: document.getElementById('count'),
+      exportBtn: document.getElementById('export-json'),
+      importBtn: document.getElementById('import-json'),
+      fileInput: document.getElementById('file-input'),
+    };
+
+    const STORAGE_KEY = 'todoflow:v1';
+    let state = load();
+    let currentFilter = 'all';
+
+    function save(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+    function load(){ try{ return JSON.parse(localStorage.getItem(STORAGE_KEY)) || [] } catch{ return [] } }
+
+    function uid(){ return Math.random().toString(36).slice(2) + Date.now().toString(36) }
+
+    function addTask(title){
+      title = title.trim();
+      if(!title) return;
+      const t = { id: uid(), title, completed:false, createdAt: Date.now() };
+      state.unshift(t); // new on top
+      save();
+      render();
+      flashCount();
+    }
+
+    function updateTask(id, patch){
+      const i = state.findIndex(t=>t.id===id);
+      if(i>-1){ state[i] = {...state[i], ...patch}; save(); renderRow(id); updateCount(); }
+    }
+
+    function deleteTask(id){
+      const row = rowById(id);
+      if(row){
+        row.style.transition = 'transform .18s ease, opacity .2s ease';
+        row.style.transform = 'scale(.98) translateY(2px)';
+        row.style.opacity = '0';
+        setTimeout(()=>{ state = state.filter(t=>t.id!==id); save(); render(); flashCount(); }, 180);
+      }
+    }
+
+    function rowById(id){ return el.list.querySelector(`[data-id="${id}"]`); }
+
+    function render(){
+      el.list.innerHTML = '';
+      const tasks = filtered();
+      if(!tasks.length){
+        el.list.innerHTML = `<div class="empty">
+          <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          <p>Nothing here yet — add your first task! ✨</p>
+        </div>`; updateCount(); return; }
+
+      const frag = document.createDocumentFragment();
+      for(const t of tasks){
+        const node = createRow(t); node.dataset.id = t.id; frag.appendChild(node);
+      }
+      el.list.appendChild(frag);
+      updateCount();
+    }
+
+    function renderRow(id){
+      const t = state.find(x=>x.id===id); if(!t) return;
+      const old = rowById(id);
+      const fresh = createRow(t); fresh.dataset.id = id;
+      if(old){ el.list.replaceChild(fresh, old); }
+    }
+
+    function filtered(){
+      if(currentFilter==='active') return state.filter(t=>!t.completed);
+      if(currentFilter==='completed') return state.filter(t=>t.completed);
+      return [...state];
+    }
+
+    function createRow(task){
+      const node = el.template.content.firstElementChild.cloneNode(true);
+      if(task.completed) node.classList.add('completed');
+
+      const checkbox = node.querySelector('.check');
+      checkbox.dataset.checked = String(!!task.completed);
+      checkbox.setAttribute('aria-checked', String(!!task.completed));
+
+      const title = node.querySelector('.task-title');
+      title.value = task.title;
+
+      // Tag if soon (created few minutes ago)
+      const tags = node.querySelector('.tags');
+      const mins = (Date.now() - task.createdAt) / 60000;
+      if(mins < 10){ const tag = document.createElement('span'); tag.className='tag soon'; tag.textContent='NEW'; tags.appendChild(tag); }
+
+      // Toggle
+      checkbox.addEventListener('click', ()=> updateTask(task.id, {completed: !task.completed}));
+      checkbox.addEventListener('keydown', (e)=>{ if(e.key===' '|| e.key==='Enter'){ e.preventDefault(); updateTask(task.id, {completed: !task.completed}); } });
+
+      // Edit on input change (debounced)
+      let editTimer;
+      title.addEventListener('input', ()=>{
+        clearTimeout(editTimer); const val = title.value;
+        editTimer = setTimeout(()=> updateTask(task.id, {title: val}), 250);
+      });
+      title.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.currentTarget.blur(); }});
+
+      // Delete
+      node.querySelector('.delete').addEventListener('click', ()=> deleteTask(task.id));
+
+      // Drag & drop
+      node.addEventListener('dragstart', (e)=>{ node.classList.add('dragging'); e.dataTransfer.effectAllowed='move'; e.dataTransfer.setData('text/plain', task.id); });
+      node.addEventListener('dragend', ()=> node.classList.remove('dragging'));
+
+      return node;
+    }
+
+    // DnD container logic
+    el.list.addEventListener('dragover', (e)=>{
+      e.preventDefault();
+      const after = getDragAfterElement(el.list, e.clientY);
+      const dragging = document.querySelector('.task.dragging');
+      if(!dragging) return;
+      if(after==null){ el.list.appendChild(dragging); }
+      else{ el.list.insertBefore(dragging, after); }
+    });
+
+    el.list.addEventListener('drop', ()=>{
+      // Persist new order based on DOM
+      const ids = [...el.list.querySelectorAll('.task')].map(n=>n.dataset.id).filter(Boolean);
+      const map = new Map(state.map(t=>[t.id, t]));
+      state = ids.map(id=>map.get(id)).filter(Boolean);
+      save();
+      render();
+    });
+
+    function getDragAfterElement(container, y){
+      const els = [...container.querySelectorAll('.task:not(.dragging)')];
+      return els.reduce((closest, child)=>{
+        const box = child.getBoundingClientRect();
+        const offset = y - box.top - box.height/2;
+        if(offset < 0 && offset > closest.offset){ return {offset, element: child} }
+        else{ return closest }
+      }, {offset: Number.NEGATIVE_INFINITY}).element;
+    }
+
+    // Controls
+    el.addBtn.addEventListener('click', ()=>{ addTask(el.input.value); el.input.value=''; el.input.focus(); });
+    el.input.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ addTask(el.input.value); el.input.value=''; }});
+
+    // Filters
+    el.chips.forEach(chip=> chip.addEventListener('click', ()=>{
+      currentFilter = chip.dataset.filter;
+      el.chips.forEach(c=>{ c.dataset.active = String(c===chip); c.setAttribute('aria-selected', String(c===chip)); });
+      render();
+    }));
+
+    // Clear completed
+    el.clearCompleted.addEventListener('click', ()=>{
+      const has = state.some(t=>t.completed);
+      if(!has) return pulse(el.clearCompleted);
+      state = state.filter(t=>!t.completed); save(); render(); flashCount();
+    });
+
+    function updateCount(){
+      const remaining = state.filter(t=>!t.completed).length;
+      el.count.textContent = `${remaining} item${remaining!==1?'s':''}`;
+    }
+
+    function flashCount(){
+      el.count.animate([
+        { transform:'scale(1)', color:'inherit'},
+        { transform:'scale(1.08)', color:'var(--accent-2)'},
+        { transform:'scale(1)', color:'inherit'},
+      ], { duration: 320, easing: 'cubic-bezier(.2,.8,.2,1)'});
+    }
+
+    function pulse(node){ node.animate([{transform:'scale(1)'},{transform:'scale(1.05)'},{transform:'scale(1)'}], {duration:240}); }
+
+    // Import/Export
+    el.exportBtn.addEventListener('click', ()=>{
+      const blob = new Blob([JSON.stringify(state, null, 2)], {type:'application/json'});
+      const url = URL.createObjectURL(blob);
+      const a = Object.assign(document.createElement('a'), {href:url, download:'todoflow-backup.json'});
+      document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=> URL.revokeObjectURL(url), 1000);
+    });
+
+    el.importBtn.addEventListener('click', ()=> el.fileInput.click());
+    el.fileInput.addEventListener('change', async (e)=>{
+      const file = e.target.files?.[0]; if(!file) return;
+      try{
+        const text = await file.text();
+        const json = JSON.parse(text);
+        if(!Array.isArray(json)) throw new Error('Invalid file format');
+        state = json.filter(x=>x && typeof x.title==='string');
+        save(); render();
+      }catch(err){ alert('Import failed: '+ err.message); }
+      finally{ e.target.value = '' }
+    });
+
+    // Initial demo items if first visit
+    if(state.length===0){ state = [
+      {id:uid(), title:'Welcome to TodoFlow ✨', completed:false, createdAt: Date.now()},
+      {id:uid(), title:'Drag tasks to reorder', completed:false, createdAt: Date.now()},
+      {id:uid(), title:'Click the square to complete', completed:false, createdAt: Date.now()},
+      {id:uid(), title:'Use filters above to view tasks', completed:false, createdAt: Date.now()},
+    ]; save(); }
+
+    render();
+  </script>
+</body>
+</html>
